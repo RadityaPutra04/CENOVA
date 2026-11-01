@@ -8,7 +8,7 @@
     :root{--ink:#17213a;--muted:#71809d;--paper:#f7f9fc;--white:#fff;--line:#e8edf5;--primary:#5b5ce2;--primary-dark:#4546c4;--mint:#c9f8e6;--shadow:0 20px 60px rgba(48,62,100,.1)}
     *{box-sizing:border-box}body{margin:0;color:var(--ink);background:var(--paper);font:15px/1.6 Inter,ui-sans-serif,system-ui,sans-serif}a{text-decoration:none;color:inherit}
     .shell{max-width:1120px;margin:auto;padding:0 28px}.topbar{height:82px;display:flex;align-items:center;justify-content:space-between}.brand{display:flex;align-items:center;gap:10px;font-size:19px;font-weight:800;letter-spacing:-.04em}.brand-mark{width:35px;height:35px;display:grid;place-items:center;border-radius:12px;color:#fff;background:var(--primary)}.nav{display:flex;gap:8px}.nav a{padding:9px 13px;border-radius:11px;color:var(--muted);font-weight:700}.nav a:hover{background:#eeeefe;color:var(--primary)}
-    main{min-height:calc(100vh - 125px);display:grid;place-items:center}.card{width:min(680px,100%);padding:clamp(28px,6vw,55px);border:1px solid var(--line);border-radius:25px;background:#fff;box-shadow:var(--shadow)}.eyebrow{color:var(--primary);font-size:12px;font-weight:800;letter-spacing:.13em;text-transform:uppercase}h1{margin:13px 0 8px;font-size:clamp(35px,6vw,58px);line-height:1;letter-spacing:-.07em}.lead{color:var(--muted);margin:0 0 30px}.upload{display:block;padding:28px;text-align:center;border:2px dashed #cfd4e7;border-radius:17px;background:#fbfcff;color:var(--muted);cursor:pointer}.upload:hover{border-color:var(--primary);color:var(--primary)}.upload input{display:none}.file-name{margin:14px 0;color:var(--primary);font-weight:700}.actions{display:flex;gap:11px;flex-wrap:wrap;margin-top:25px}.btn{padding:13px 20px;border:0;border-radius:13px;font:inherit;font-weight:750;cursor:pointer}.btn-primary{color:#fff;background:var(--primary);box-shadow:0 10px 24px rgba(91,92,226,.25)}.btn-primary:hover{background:var(--primary-dark)}.btn-soft{color:var(--primary);background:#e9e9ff}#task-output{margin-top:24px;padding:18px;border-left:4px solid var(--primary);background:#f8f8ff;color:#56617b;white-space:pre-line}.hidden{display:none}footer{padding:0 0 30px;color:var(--muted);font-size:13px;text-align:center}
+    main{min-height:calc(100vh - 125px);display:grid;place-items:center}.card{width:min(680px,100%);padding:clamp(28px,6vw,55px);border:1px solid var(--line);border-radius:25px;background:#fff;box-shadow:var(--shadow)}.eyebrow{color:var(--primary);font-size:12px;font-weight:800;letter-spacing:.13em;text-transform:uppercase}h1{margin:13px 0 8px;font-size:clamp(35px,6vw,58px);line-height:1;letter-spacing:-.07em}.lead{color:var(--muted);margin:0 0 30px}.upload{display:block;padding:28px;text-align:center;border:2px dashed #cfd4e7;border-radius:17px;background:#fbfcff;color:var(--muted);cursor:pointer}.upload:hover{border-color:var(--primary);color:var(--primary)}.upload input{display:none}.file-name{margin:14px 0;color:var(--primary);font-weight:700}.actions{display:flex;gap:11px;flex-wrap:wrap;margin-top:25px}.btn{padding:13px 20px;border:0;border-radius:13px;font:inherit;font-weight:750;cursor:pointer}.btn-primary{color:#fff;background:var(--primary);box-shadow:0 10px 24px rgba(91,92,226,.25)}.btn-primary:hover{background:var(--primary-dark)}.btn-soft{color:var(--primary);background:#e9e9ff}#task-output{margin-top:24px;padding:18px;border-left:4px solid var(--primary);background:#f8f8ff;color:#56617b;white-space:pre-line}.saved-list{margin-top:24px;padding-top:18px;border-top:1px solid var(--line)}.saved-list h3{margin:0 0 8px}.saved-list ul{margin:0;padding-left:20px;color:var(--muted)}.hidden{display:none}footer{padding:0 0 30px;color:var(--muted);font-size:13px;text-align:center}
     @media(max-width:650px){.shell{padding:0 18px}.topbar{height:auto;min-height:82px;gap:12px}.nav{gap:0}.nav a{padding:8px}}
   </style>
 </head>
@@ -23,22 +23,65 @@
       <div class="file-name" id="file-name">Belum ada file dipilih</div>
       <div class="actions"><button class="btn btn-primary" id="create-task" type="button">Buat Tugas</button><a class="btn btn-soft" href="index.html">Kembali ke profesi</a></div>
       <div id="task-output" class="hidden"></div>
+      <div class="saved-list"><h3>Materi tersimpan</h3><ul id="saved-materials"><li>Belum ada materi.</li></ul></div>
     </section>
   </main>
   <footer class="shell">© 2026 Digilearn · Ruang belajar untuk guru.</footer>
   <script>
+    const DB_NAME = "digilearn-materials";
+    const STORE_NAME = "files";
     const fileInput = document.getElementById("pdf-file");
     const fileName = document.getElementById("file-name");
     const output = document.getElementById("task-output");
-    fileInput.addEventListener("change", () => { const file = fileInput.files[0]; fileName.textContent = file ? `${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)` : "Belum ada file dipilih"; output.classList.add("hidden"); });
-    document.getElementById("create-task").addEventListener("click", () => {
+    function openDatabase() {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, 1);
+        request.onupgradeneeded = () => request.result.createObjectStore(STORE_NAME, { keyPath: "id" });
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(new Error("Penyimpanan browser tidak tersedia."));
+      });
+    }
+    async function saveMaterial(file) {
+      const database = await openDatabase();
+      await new Promise((resolve, reject) => {
+        const transaction = database.transaction(STORE_NAME, "readwrite");
+        transaction.objectStore(STORE_NAME).put({ id: crypto.randomUUID(), name: file.name, size: file.size, type: file.type, createdAt: new Date().toISOString(), blob: file });
+        transaction.oncomplete = resolve;
+        transaction.onerror = () => reject(new Error("PDF gagal disimpan."));
+      });
+      database.close();
+    }
+    async function listMaterials() {
+      const database = await openDatabase();
+      const materials = await new Promise((resolve, reject) => {
+        const request = database.transaction(STORE_NAME).objectStore(STORE_NAME).getAll();
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(new Error("Materi tersimpan gagal dibaca."));
+      });
+      database.close();
+      document.getElementById("saved-materials").innerHTML = materials.length ? materials.map((item) => `<li>${item.name} — ${(item.size / 1024 / 1024).toFixed(2)} MB</li>`).join("") : "<li>Belum ada materi.</li>";
+    }
+    fileInput.addEventListener("change", async () => {
+      const file = fileInput.files[0];
+      fileName.textContent = file ? `${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)` : "Belum ada file dipilih";
+      output.classList.add("hidden");
+      if (!file) return;
+      if (file.type !== "application/pdf") { alert("File yang dipilih harus berformat PDF."); fileInput.value = ""; return; }
+      if (file.size > 10 * 1024 * 1024) { alert("Ukuran file maksimal 10 MB."); fileInput.value = ""; return; }
+      try { await saveMaterial(file); await listMaterials(); fileName.textContent += " — tersimpan"; } catch (error) { alert(error.message); }
+    });
+    document.getElementById("create-task").addEventListener("click", async () => {
       const file = fileInput.files[0];
       if (!file) { alert("Pilih file PDF materi terlebih dahulu."); return; }
       if (file.type !== "application/pdf") { alert("File yang dipilih harus berformat PDF."); return; }
       if (file.size > 10 * 1024 * 1024) { alert("Ukuran file maksimal 10 MB."); return; }
+      const button = document.getElementById("create-task");
+      button.disabled = true;
       output.textContent = `Tugas berhasil dibuat dari "${file.name}".\n\n1. Baca materi dan catat tiga konsep utama.\n2. Buat rangkuman 150 kata.\n3. Kerjakan lima pertanyaan refleksi dari materi.\n\nTugas siap dibagikan kepada mahasiswa.`;
       output.classList.remove("hidden");
+      button.disabled = false;
     });
+    listMaterials().catch((error) => { document.getElementById("saved-materials").innerHTML = `<li>${error.message}</li>`; });
   </script>
 </body>
 </html>
