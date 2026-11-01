@@ -651,14 +651,24 @@
             <div>
               <div style="font-size: 38px">✦</div>
               <h3>Quiz dasar pemrograman</h3>
-              <p>Materi akan dipilih dari PDF yang diunggah guru.</p>
+              <p>Materi akan dipilih dari PDF yang diunggah Dosen.</p>
               <div class="material-form">
                 <label for="material-select">Pilih materi</label>
                 <select class="material-select" id="material-select">
                   <option value="">Memuat materi tersimpan...</option>
                 </select>
-                <small>Quiz dibuat AI melalui server yang menyimpan API key secara aman.</small>
-                <button class="btn btn-primary" id="start-quiz-button" type="button" style="margin-top:16px">Pilih materi & mulai quiz →</button>
+                <small
+                  >Quiz dibuat AI melalui server yang menyimpan API key secara
+                  aman.</small
+                >
+                <button
+                  class="btn btn-primary"
+                  id="start-quiz-button"
+                  type="button"
+                  style="margin-top: 16px"
+                >
+                  Pilih materi & mulai quiz →
+                </button>
               </div>
             </div>
           </div>
@@ -721,7 +731,9 @@
                 Analisis dengan Gemini
               </button>
             </div>
-            <small class="muted">Analisis memakai Gemini melalui server Digilearn.</small>
+            <small class="muted"
+              >Analisis memakai Gemini melalui server Digilearn.</small
+            >
           </div>
         </section>
       </main>
@@ -753,7 +765,14 @@
         </div>
       </main>
     </section>
-    <button class="back-to-top" id="back-to-top" aria-label="Kembali ke atas" title="Kembali ke atas">↑</button>
+    <button
+      class="back-to-top"
+      id="back-to-top"
+      aria-label="Kembali ke atas"
+      title="Kembali ke atas"
+    >
+      ↑
+    </button>
 
     <script>
       let questions = [
@@ -836,57 +855,100 @@
       function openMaterialDatabase() {
         return new Promise((resolve, reject) => {
           const request = indexedDB.open(MATERIAL_DB, 1);
-          request.onupgradeneeded = () => request.result.createObjectStore(MATERIAL_STORE, { keyPath: "id" });
+          request.onupgradeneeded = () =>
+            request.result.createObjectStore(MATERIAL_STORE, { keyPath: "id" });
           request.onsuccess = () => resolve(request.result);
-          request.onerror = () => reject(new Error("Penyimpanan materi tidak tersedia di browser ini."));
+          request.onerror = () =>
+            reject(
+              new Error("Penyimpanan materi tidak tersedia di browser ini."),
+            );
         });
       }
       async function loadMaterials() {
         const database = await openMaterialDatabase();
         const materials = await new Promise((resolve, reject) => {
-          const request = database.transaction(MATERIAL_STORE).objectStore(MATERIAL_STORE).getAll();
+          const request = database
+            .transaction(MATERIAL_STORE)
+            .objectStore(MATERIAL_STORE)
+            .getAll();
           request.onsuccess = () => resolve(request.result);
           request.onerror = () => reject(new Error("Materi PDF gagal dibaca."));
         });
         database.close();
         const select = $("material-select");
         select.innerHTML = materials.length
-          ? '<option value="">Pilih salah satu materi...</option>' + materials.map((item) => `<option value="${item.id}">${item.name}</option>`).join("")
-          : '<option value="">Belum ada PDF dari guru</option>';
-        select.dataset.materials = JSON.stringify(materials.map(({ id, name, size }) => ({ id, name, size })));
+          ? '<option value="">Pilih salah satu materi...</option>' +
+            materials
+              .map((item) => `<option value="${item.id}">${item.name}</option>`)
+              .join("")
+          : '<option value="">Belum ada PDF dari Dosen</option>';
+        select.dataset.materials = JSON.stringify(
+          materials.map(({ id, name, size }) => ({ id, name, size })),
+        );
         select._materials = materials;
       }
       function blobToBase64(blob) {
         return new Promise((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => resolve(String(reader.result).split(",")[1]);
-          reader.onerror = () => reject(new Error("PDF gagal dibaca untuk AI."));
+          reader.onerror = () =>
+            reject(new Error("PDF gagal dibaca untuk AI."));
           reader.readAsDataURL(blob);
         });
       }
       function parseGeneratedQuestions(text) {
         const cleaned = text.replace(/```json|```/gi, "").trim();
         const parsed = JSON.parse(cleaned);
-        if (!Array.isArray(parsed) || parsed.length < 3) throw new Error("AI tidak menghasilkan jumlah pertanyaan yang valid.");
+        if (!Array.isArray(parsed) || parsed.length < 3)
+          throw new Error(
+            "AI tidak menghasilkan jumlah pertanyaan yang valid.",
+          );
         return parsed.map((item, index) => {
-          if (!item.topic || !item.text || !Array.isArray(item.options) || item.options.length !== 4 || !Number.isInteger(item.answer) || item.answer < 0 || item.answer > 3) throw new Error(`Format pertanyaan AI nomor ${index + 1} tidak valid.`);
-          return { topic: String(item.topic), text: String(item.text), options: item.options.map(String), answer: item.answer };
+          if (
+            !item.topic ||
+            !item.text ||
+            !Array.isArray(item.options) ||
+            item.options.length !== 4 ||
+            !Number.isInteger(item.answer) ||
+            item.answer < 0 ||
+            item.answer > 3
+          )
+            throw new Error(
+              `Format pertanyaan AI nomor ${index + 1} tidak valid.`,
+            );
+          return {
+            topic: String(item.topic),
+            text: String(item.text),
+            options: item.options.map(String),
+            answer: item.answer,
+          };
         });
       }
       async function generateQuizFromMaterial(material) {
         const response = await fetch("/api/generate-quiz", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ mimeType: "application/pdf", pdfBase64: await blobToBase64(material.blob) }),
+          body: JSON.stringify({
+            mimeType: "application/pdf",
+            pdfBase64: await blobToBase64(material.blob),
+          }),
         });
         const payload = await response.json();
-        if (!response.ok) throw new Error(payload.error || `Server mengembalikan status ${response.status}.`);
+        if (!response.ok)
+          throw new Error(
+            payload.error || `Server mengembalikan status ${response.status}.`,
+          );
         return parseGeneratedQuestions(payload.text);
       }
       async function startMaterialQuiz() {
         const materialId = $("material-select").value;
-        const material = $("material-select")._materials?.find((item) => item.id === materialId);
-        if (!material) { alert("Pilih materi PDF terlebih dahulu."); return; }
+        const material = $("material-select")._materials?.find(
+          (item) => item.id === materialId,
+        );
+        if (!material) {
+          alert("Pilih materi PDF terlebih dahulu.");
+          return;
+        }
         const button = $("start-quiz-button");
         button.disabled = true;
         button.textContent = "AI sedang membaca materi...";
@@ -1026,7 +1088,11 @@
             body: JSON.stringify({ result }),
           });
           const payload = await response.json();
-          if (!response.ok) throw new Error(payload.error || `Server mengembalikan status ${response.status}.`);
+          if (!response.ok)
+            throw new Error(
+              payload.error ||
+                `Server mengembalikan status ${response.status}.`,
+            );
           const text = payload.text;
           if (!text) throw new Error("Respons Gemini tidak berisi ringkasan.");
           localStorage.setItem("Digilearn-summary", text);
@@ -1044,7 +1110,9 @@
       });
       $("settings-button").addEventListener("click", () => {
         $("menu").classList.remove("open");
-        alert("Settings tersedia di sini. Hasil quiz tersimpan otomatis di perangkat ini.");
+        alert(
+          "Settings tersedia di sini. Hasil quiz tersimpan otomatis di perangkat ini.",
+        );
       });
       $("start-quiz-button").addEventListener("click", startMaterialQuiz);
       document.querySelectorAll(".navbar a").forEach((link) => {
@@ -1061,7 +1129,9 @@
         });
       });
       document
-        .querySelectorAll('.actions a[href="#quiz"], .actions a[href="#dashboard"]')
+        .querySelectorAll(
+          '.actions a[href="#quiz"], .actions a[href="#dashboard"]',
+        )
         .forEach((link) => {
           link.addEventListener("click", (event) => {
             event.preventDefault();
@@ -1110,7 +1180,8 @@
       });
       window.addEventListener("hashchange", showPage);
       loadMaterials().catch((error) => {
-        $("material-select").innerHTML = `<option value="">${error.message}</option>`;
+        $("material-select").innerHTML =
+          `<option value="">${error.message}</option>`;
       });
       showPage();
     </script>
